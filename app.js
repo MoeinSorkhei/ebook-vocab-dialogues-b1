@@ -480,6 +480,13 @@
       if (current) current.pause();
       document.title = (u.label || u.unit) + ". " + u.title;
       app.innerHTML = "";
+      var pos = EBOOK.index.findIndex(function (x) { return x.unit === u.unit; });
+      var prev = EBOOK.index[pos - 1], next = EBOOK.index[pos + 1];
+      app.appendChild(el("nav", { class: "nav" }, [
+        prev ? el("a", { href: "#/u/" + prev.unit, text: "← " + (prev.label || prev.unit) + ". " + prev.title }) : el("span"),
+        el("a", { href: "#", class: "toc-link", text: "Sommaire" }),
+        next ? el("a", { href: "#/u/" + next.unit, text: (next.label || next.unit) + ". " + next.title + " →" }) : el("span")
+      ]));
       var scans = u.scans || [];
       app.appendChild(el("div", { class: "unit-head" }, [
         el("span", { class: "num", text: u.label || u.unit }), el("h1", { text: u.title }),
@@ -504,13 +511,6 @@
         });
         p.exercises.forEach(function (ex) { app.appendChild(renderExercise(ex, p.page, u.unit)); });
       });
-      var pos = EBOOK.index.findIndex(function (x) { return x.unit === u.unit; });
-      var prev = EBOOK.index[pos - 1], next = EBOOK.index[pos + 1];
-      app.appendChild(el("nav", { class: "nav" }, [
-        prev ? el("a", { href: "#/u/" + prev.unit, text: "← " + (prev.label || prev.unit) + ". " + prev.title }) : el("span"),
-        el("a", { href: "#", class: "toc-link", text: "Sommaire" }),
-        next ? el("a", { href: "#/u/" + next.unit, text: (next.label || next.unit) + ". " + next.title + " →" }) : el("span")
-      ]));
       window.scrollTo(0, 0);
       store.set("last", u.unit);
     });

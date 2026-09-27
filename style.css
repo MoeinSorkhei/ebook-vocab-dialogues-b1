@@ -217,7 +217,7 @@ details.transcript p { margin: .4rem 0; }
 }
 .unlock button { border: 0; border-radius: 10px; padding: .6rem; background: var(--green); color: #fff; font-weight: 700; }
 .pw-msg { margin: 0; color: var(--ko); min-height: 1.4em; }
-.nav { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; margin-top: 2rem; }
+.nav { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; margin: .2rem 0 1rem; font-size: .85rem; }
 .nav > * { flex: 1; }
 .nav > :last-child { text-align: right; }
 .nav > .toc-link { flex: none; font-weight: 400; color: var(--muted); }
