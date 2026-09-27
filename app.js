@@ -57,6 +57,86 @@
     set: function (k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch (e) {} }
   };
 
+  // ---------- progress (answers, scores, last seen), synced across devices ----------
+  // Each entry is {v, t}: merging two devices keeps, per key, the most recent write.
+  var P = {
+    data: store.get("progress", null),
+    get: function (k, d) { var e = P.data[k]; return e && e.v != null ? e.v : d; },
+    set: function (k, v) { P.data[k] = { v: v, t: Date.now() }; P.save(); sync.schedule(); },
+    save: function () { store.set("progress", P.data); },
+    merge: function (other) {
+      var changed = false, newer = false;
+      Object.keys(other).forEach(function (k) {
+        var a = P.data[k], b = other[k];
+        if (!a || b.t > a.t) { P.data[k] = b; changed = true; }
+      });
+      Object.keys(P.data).forEach(function (k) { if (!other[k] || P.data[k].t > other[k].t) newer = true; });
+      if (changed) P.save();
+      return { changed: changed, newer: newer };
+    }
+  };
+  if (!P.data) {  // first run of this version: move answers saved by the previous one
+    P.data = {};
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k.indexOf(NS + "u") === 0 || k === NS + "last") {
+        try { P.data[k.slice(NS.length)] = { v: JSON.parse(localStorage.getItem(k)), t: 1 }; } catch (e) {}
+      }
+    }
+    P.save();
+  }
+
+  function utf8b64(s) { return btoa(unescape(encodeURIComponent(s))); }
+  function b64utf8(s) { return decodeURIComponent(escape(atob(s.replace(/\s/g, "")))); }
+
+  var sync = {
+    sha: null, timer: null, running: null,
+    cfg: function () { return EBOOK.sync && EBOOK.sync.token ? EBOOK.sync : null; },
+    url: function () { return "https://api.github.com/repos/" + sync.cfg().repo + "/contents/" + EBOOK.id + ".json"; },
+    headers: function () { return { Authorization: "Bearer " + sync.cfg().token, Accept: "application/vnd.github+json" }; },
+    pull: function () {
+      if (!sync.cfg()) return Promise.resolve({ changed: false, newer: false });
+      return fetch(sync.url(), { headers: sync.headers(), cache: "no-store" }).then(function (r) {
+        if (r.status === 404) { sync.sha = null; return { changed: false, newer: true }; }
+        if (!r.ok) throw new Error("sync " + r.status);
+        return r.json().then(function (j) { sync.sha = j.sha; return P.merge(JSON.parse(b64utf8(j.content))); });
+      });
+    },
+    push: function (retry) {
+      var body = { message: "progress", content: utf8b64(JSON.stringify(P.data)) };
+      if (sync.sha) body.sha = sync.sha;
+      return fetch(sync.url(), { method: "PUT", headers: sync.headers(), body: JSON.stringify(body) }).then(function (r) {
+        if ((r.status === 409 || r.status === 422) && !retry) {  // another device wrote first
+          return sync.pull().then(function () { return sync.push(true); });
+        }
+        if (!r.ok) throw new Error("sync " + r.status);
+        return r.json().then(function (j) { sync.sha = j.content.sha; });
+      });
+    },
+    // pull, merge, and push back whatever this device has that the server doesn't
+    now: function () {
+      if (!sync.cfg()) return Promise.resolve(false);
+      if (sync.running) return sync.running;
+      clearTimeout(sync.timer);
+      sync.running = sync.pull().then(function (m) {
+        return (m.newer ? sync.push() : Promise.resolve()).then(function () { return m.changed; });
+      }).catch(function (e) { console.warn(e); return false; })
+        .then(function (changed) { sync.running = null; return changed; });
+      return sync.running;
+    },
+    schedule: function () {
+      if (!sync.cfg()) return;
+      clearTimeout(sync.timer);
+      sync.timer = setTimeout(sync.now, 2000);
+    }
+  };
+  document.addEventListener("visibilitychange", function () {
+    if (!sync.cfg()) return;
+    if (document.visibilityState === "hidden") { if (sync.timer) sync.now(); return; }
+    var typing = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+    sync.now().then(function (changed) { if (changed && !typing) route(); });
+  });
+
   // ---------- encrypted deployment ----------
   var aesKey = null;
   var assetCache = {};
@@ -150,18 +230,30 @@
   var current = null;
   var SPEEDS = [1, 0.9, 0.75, 1.25];
 
+  function skipIcon(forward) {
+    var arc = forward ? "M18.06 9.5A7 7 0 1 1 12 6" : "M5.94 9.5A7 7 0 1 0 12 6";
+    var head = forward ? "M9.6 3.6L12 6 9.6 8.4" : "M14.4 3.6L12 6l2.4 2.4";
+    return '<svg viewBox="2 1 20 20" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="' + arc + '"/><path d="' + head + '"/>' +
+      '<text x="12" y="16.2" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">5</text></svg>';
+  }
+
   function player(src, title) {
     var a = new Audio();
     a.preload = "metadata";
     asset(src).then(function (u) { a.src = u; });
     var play = el("button", { class: "play", title: "Lecture / pause", text: "▶" });
-    var back = el("button", { title: "Reculer de 5 s", text: "−5" });
-    var fwd = el("button", { title: "Avancer de 5 s", text: "+5" });
+    var back = el("button", { class: "skip", title: "Reculer de 5 s", "aria-label": "Reculer de 5 s" });
+    var fwd = el("button", { class: "skip", title: "Avancer de 5 s", "aria-label": "Avancer de 5 s" });
+    back.innerHTML = skipIcon(false);
+    fwd.innerHTML = skipIcon(true);
     var bar = el("input", { class: "bar", type: "range", min: 0, max: 1000, value: 0, "aria-label": "Position" });
     var time = el("span", { class: "time", text: "0:00 / 0:00" });
     var sp = 0;
     var speed = el("button", { class: "speed", title: "Vitesse", text: "1×" });
-    var loop = el("button", { class: "loop", title: "Répéter", text: "⟳" });
+    var loop = el("button", { class: "loop", title: "Répéter", "aria-label": "Répéter" });
+    loop.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>';
 
     function seek(d) { a.currentTime = Math.max(0, Math.min((a.duration || 0), a.currentTime + d)); }
     play.onclick = function () { a.paused ? a.play() : a.pause(); };
@@ -273,7 +365,9 @@
         var j = slot++;
         var inp = el("input", { class: "blank", type: "text", autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
         inp.value = state.v[j] || "";
-        inp.oninput = function () { state.v[j] = inp.value; state.save(); inp.className = "blank"; };
+        var grow = function () { inp.style.width = inp.value.length > 6 ? "calc(" + inp.value.length + "ch + 1.5rem)" : ""; };
+        grow();
+        inp.oninput = function () { grow(); state.v[j] = inp.value; state.save(); inp.className = "blank"; };
         controls.push({ kind: "blank", i: j, node: inp });
         wrap.appendChild(inp);
       } else if (part) {
@@ -285,7 +379,7 @@
 
   function renderItem(it, ex, unitKey) {
     var skey = unitKey + ":" + it.n;
-    var state = { v: store.get(skey, {}), save: function () { store.set(skey, state.v); } };
+    var state = { v: P.get(skey, null) || {}, save: function () { P.set(skey, state.v); } };
     var controls = [];
     var li = el("li", { class: "item" }, [el("span", { class: "n", text: num(it.n) + "." })]);
     if (ex.type !== "photo_comment") li.appendChild(renderPrompt(it, ex, state, controls));
@@ -381,31 +475,59 @@
 
     var actions = el("div", { class: "ex-actions" });
     var hasChecks = ex.items.some(function (it) { return it.key && it.key.answers && it.key.answers.length; });
+    var check = function () {
+      var n = 0, t = 0;
+      items.forEach(function (li) { var r = li.check(); if (r !== null) { t++; if (r) n++; } });
+      return [n, t];
+    };
     if (checkable && hasChecks) {
       actions.appendChild(el("button", {
         text: "Vérifier", type: "button", onclick: function () {
-          var n = 0, t = 0;
-          items.forEach(function (li) { var r = li.check(); if (r !== null) { t++; if (r) n++; } });
-          score.textContent = n + " / " + t;
-          store.set(unitKey + ":score", [n, t]);
+          var r = check();
+          score.textContent = r[0] + " / " + r[1];
+          P.set(unitKey + ":score", r);
+          updateDone(unit);
         }
       }));
     }
     if (hasKey) {
+      unitExercises.push(unitKey);
       var btn = el("button", {
         class: "secondary", type: "button", text: "Afficher le corrigé", onclick: function () {
           var on = card.classList.toggle("show-key");
           btn.textContent = on ? "Masquer le corrigé" : "Afficher le corrigé";
+          if (on) { P.set(unitKey + ":shown", true); updateDone(unit); }
         }
       });
       actions.appendChild(btn);
       actions.appendChild(el("span", { class: "ai-note", text: ex.official_key ? "corrigé officiel" : "corrigé proposé (IA)" }));
     }
     actions.appendChild(score);
-    var saved = store.get(unitKey + ":score", null);
+    var saved = P.get(unitKey + ":score", null);
     if (saved) score.textContent = "dernier score : " + saved[0] + " / " + saved[1];
+    actions.appendChild(el("button", {
+      class: "reset", type: "button", text: "Réinitialiser", title: "Effacer mes réponses de cet exercice",
+      onclick: function () {
+        if (!confirm("Effacer vos réponses pour cet exercice ?")) return;
+        ex.items.forEach(function (it) { P.set(unitKey + ":" + it.n, null); });
+        P.set(unitKey + ":score", null);
+        P.set(unitKey + ":shown", null);
+        card.replaceWith(renderExercise(ex, page, unit));
+        updateDone(unit);
+      }
+    }));
     card.appendChild(actions);
+    if (saved && checkable && hasChecks) check();  // show last session's right/wrong marks again
     return card;
+  }
+
+  // a unit is done when every exercise with a corrigé was checked or had its corrigé opened
+  var unitExercises = [];
+  function updateDone(unit) {
+    var done = unitExercises.length > 0 && unitExercises.every(function (k) {
+      return P.get(k + ":score", null) || P.get(k + ":shown", null);
+    });
+    if (done !== P.get("done:" + unit, false)) P.set("done:" + unit, done);
   }
 
   // ---------- views ----------
@@ -423,6 +545,7 @@
       list.appendChild(el("li", {}, [el("a", { href: "#/u/" + u.unit }, [
         el("span", { class: "num", text: u.label || u.unit }),
         el("span", { text: u.title }),
+        seenTag(u.unit),
         el("span", { class: "pages", text: "p. " + u.from + "–" + u.to })
       ])]));
     });
@@ -461,6 +584,17 @@
     document.body.appendChild(viewer);
   }
 
+  var MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+  function seenTag(unit) {
+    var t = P.get("seen:" + unit, null);
+    if (!t) return null;
+    var d = new Date(t), now = new Date();
+    var date = d.getDate() + " " + MONTHS[d.getMonth()] + (d.getFullYear() !== now.getFullYear() ? " " + d.getFullYear() : "");
+    return el("span", { class: "seen", title: "Vu pour la dernière fois le " + d.toLocaleString("fr-FR") }, [
+      "vu le " + date, P.get("done:" + unit, false) ? el("span", { class: "tick", text: " ✓", title: "Terminé" }) : null
+    ]);
+  }
+
   function loadUnit(n, cb) {
     if (EBOOK.units[n]) return cb(EBOOK.units[n]);
     if (EBOOK.encrypted) {
@@ -478,6 +612,8 @@
   function unitView(n) {
     loadUnit(n, function (u) {
       if (current) current.pause();
+      unitExercises = [];
+      P.set("seen:" + u.unit, Date.now());
       document.title = (u.label || u.unit) + ". " + u.title;
       app.innerHTML = "";
       var pos = EBOOK.index.findIndex(function (x) { return x.unit === u.unit; });
@@ -512,7 +648,7 @@
         p.exercises.forEach(function (ex) { app.appendChild(renderExercise(ex, p.page, u.unit)); });
       });
       window.scrollTo(0, 0);
-      store.set("last", u.unit);
+      P.set("last", u.unit);
     });
   }
 
@@ -522,12 +658,16 @@
   }
   function start() {
     window.addEventListener("hashchange", route);
+    // show the page right away from this device's copy, then refresh if another device had newer progress
     route();
+    sync.now().then(function (changed) { if (changed) route(); });
   }
   if (!EBOOK.encrypted) start();
   else unlock().then(function () { return fetchJson("data/index.enc"); }).then(function (idx) {
     EBOOK.title = idx.title;
     EBOOK.index = idx.index;
+    EBOOK.id = idx.id;
+    EBOOK.sync = idx.sync;
     start();
   });
 })();

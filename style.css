@@ -157,9 +157,12 @@ s { text-decoration-thickness: 2px; color: var(--muted); }
   display: grid; place-items: center; font-size: .75rem; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.12);
 }
 .player button.play { background: var(--accent, var(--green)); color: #fff; width: 2.7rem; height: 2.7rem; font-size: 1rem; }
+.player button.skip { background: transparent; box-shadow: none; color: var(--ink); opacity: .7; width: 2.2rem; padding: 0; }
+.player button.skip:hover { opacity: 1; }
+.player button svg { display: block; }
 .player button.speed { border-radius: 8px; width: auto; padding: 0 .5rem; }
 .player button.loop.on { background: var(--accent, var(--green)); color: #fff; }
-.player .bar { flex: 1 1 8rem; accent-color: var(--accent, var(--green)); }
+.player .bar { flex: 1 1 4rem; min-width: 3rem; accent-color: var(--accent, var(--green)); }
 .player .time { font-variant-numeric: tabular-nums; font-size: .8rem; color: var(--muted); min-width: 5.5rem; text-align: right; }
 
 /* exercises */
@@ -185,7 +188,7 @@ s { text-decoration-thickness: 2px; color: var(--muted); }
 .chip.wrong { border-color: var(--ko); background: var(--ko); color: #fff; }
 input.blank {
   font: inherit; border: 0; border-bottom: 2px solid var(--muted); background: transparent; color: var(--ink);
-  min-width: 5.5rem; width: 7rem; padding: 0 .2rem; text-align: center;
+  min-width: 5.5rem; width: 7rem; max-width: 100%; padding: 0 .2rem; text-align: center;
 }
 input.blank.right { border-color: var(--ok); color: var(--ok); }
 input.blank.wrong { border-color: var(--ko); color: var(--ko); }
@@ -205,6 +208,14 @@ textarea {
 }
 .ex-actions button.secondary { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
 .ex-actions .score { color: var(--muted); font-size: .9rem; }
+.ex-actions button.reset {
+  margin-left: auto; background: none; border: 0; padding: .2rem 0; color: var(--muted);
+  font-size: .8rem; text-decoration: underline; text-underline-offset: 2px; opacity: .8;
+}
+.ex-actions button.reset:hover { opacity: 1; }
+.unit-list .seen { margin-left: auto; font-style: italic; color: #a9adb3; font-size: .78rem; white-space: nowrap; }
+.unit-list .seen + .pages { margin-left: .9rem; }
+.unit-list .tick { font-style: normal; color: #93c47d; font-weight: 700; }
 .ai-note { color: var(--muted); font-size: .75rem; }
 details.transcript { margin: .5rem 0; font-size: .93rem; }
 details.transcript summary { cursor: pointer; color: var(--green-dark); font-weight: 600; }
