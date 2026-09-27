@@ -228,8 +228,12 @@ details.transcript p { margin: .4rem 0; }
 }
 .unlock button { border: 0; border-radius: 10px; padding: .6rem; background: var(--green); color: #fff; font-weight: 700; }
 .pw-msg { margin: 0; color: var(--ko); min-height: 1.4em; }
-.nav { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; margin: .2rem 0 1rem; font-size: .85rem; }
-.nav > * { flex: 1; }
+.nav {
+  display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; margin: .2rem -.9rem 1rem; font-size: .85rem;
+  position: sticky; top: var(--topbar-h, 3rem); z-index: 9; background: var(--bg); padding: .55rem .9rem;
+  border-bottom: 1px solid var(--line);
+}
+.nav > * { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav > :last-child { text-align: right; }
 .nav > .toc-link { flex: none; font-weight: 400; color: var(--muted); }
 .nav a { color: var(--green-dark); font-weight: 600; text-decoration: none; }

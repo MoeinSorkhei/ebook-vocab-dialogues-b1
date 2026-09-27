@@ -226,6 +226,15 @@
   applyTheme();
   themeBtn.onclick = function () { theme = theme === "dark" ? "light" : "dark"; applyTheme(); };
 
+  // the unit nav sticks right under the top bar, whose height depends on the safe area and font size
+  var topbar = document.querySelector(".topbar");
+  function topbarHeight() { document.documentElement.style.setProperty("--topbar-h", topbar.offsetHeight + "px"); }
+  if (topbar) {
+    topbarHeight();
+    if (window.ResizeObserver) new ResizeObserver(topbarHeight).observe(topbar);
+    else window.addEventListener("resize", topbarHeight);
+  }
+
   // ---------- audio player ----------
   var current = null;
   var SPEEDS = [1, 0.9, 0.75, 1.25];
