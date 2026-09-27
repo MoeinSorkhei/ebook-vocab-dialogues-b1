@@ -1,0 +1,1 @@
+var EBOOK = {"encrypted": true, "units": {}, "index": [], "crypto": {"salt": "2rXGyzY8HidTu49+VfzWAQ==", "iterations": 250000, "check": "wqy8nZJX7Fc2xoUblaVjHtRGiMHlxr3IkDamnyRXWc/VJk+59uX2FncBa6EA"}};

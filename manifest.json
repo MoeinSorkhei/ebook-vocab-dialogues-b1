@@ -1,0 +1,9 @@
+{
+  "name": "Vocabulaire en dialogues — B1",
+  "short_name": "Vocab B1",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f2",
+  "theme_color": "#a87c5f",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}
