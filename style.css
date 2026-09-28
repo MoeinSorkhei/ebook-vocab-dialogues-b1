@@ -47,12 +47,22 @@ button { font: inherit; cursor: pointer; }
   padding: .5rem 1rem; padding-top: max(.5rem, env(safe-area-inset-top));
   background: var(--green); color: #fff;
 }
-.brand { color: #fff; text-decoration: none; font-weight: 700; }
+.brand {
+  color: #fff; text-decoration: none; font-weight: 700; flex: 1; min-width: 0; line-height: 1.2; margin-right: .3rem;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.tools { flex: none; display: flex; }
 .brand span { font-weight: 400; opacity: .85; }
 .lib { color: #fff; text-decoration: none; font-size: .85rem; opacity: .85; padding: .2rem .55rem;
        margin-right: .5rem; border-radius: 8px; background: rgba(255, 255, 255, .16); white-space: nowrap; }
 .lib:hover { opacity: 1; }
 .tools button { background: rgba(255,255,255,.2); border: 0; color: #fff; border-radius: 6px; padding: .2rem .55rem; margin-left: .3rem; }
+@media (max-width: 480px) {
+  .brand { font-size: .88rem; }
+  .lib { padding: .2rem .6rem; margin-right: .55rem; }
+  .lib span { display: none; }
+  .tools button { padding: .2rem .45rem; margin-left: .25rem; }
+}
 main { max-width: 760px; margin: 0 auto; padding: 1rem .9rem 5rem; }
 
 /* home */
