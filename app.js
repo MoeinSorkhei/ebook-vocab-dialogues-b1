@@ -334,7 +334,8 @@
     if (b.kind === "dialogue") return renderDialogue(b, idx);
     if (b.kind === "text" || b.kind === "other") {
       return el("section", { class: "card text-block" }, [
-        el("h2", {}, [b.number ? el("span", { class: "badge", text: b.number }) : null, el("span", { html: b.title })])
+        el("h2", {}, [b.number ? el("span", { class: "badge", text: b.number }) : null, el("span", { html: b.title })]),
+        b.audio ? player(b.audio, b.title) : null
       ].concat(photos(b.photos), [el("div", { html: b.html })]));
     }
     return el("section", { class: "box " + b.kind }, [el("h3", { html: b.title })]
